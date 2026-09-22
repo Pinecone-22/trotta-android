@@ -99,6 +99,4 @@ I file in `app/src/test/resources/fixtures` sono risposte reali catturate da tic
 
 - Gli orari di passaggio per Fiumicino sono stimati, come descritto sopra.
 - La validazione di un biglietto richiede il codice vettura esposto a bordo e viene rifiutata dal sistema se il codice è errato.
-- L'app dipende dall'HTML del sito del gestore per l'area clienti: se il sito cambia struttura, i parser vanno aggiornati.
-
-Il codice sorgente non è accompagnato da una licenza, quindi resta riservato all'autore.
+- L'app dipende dall'HTML del sito del gestore per l'area clienti e se il sito cambia struttura (IMPROBABILE perche' trotta fa cagare), i parser vanno aggiornati.
