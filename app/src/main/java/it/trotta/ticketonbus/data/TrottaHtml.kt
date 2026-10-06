@@ -20,7 +20,12 @@ internal object TrottaHtml {
         """NON EFFETTUATA\.?(.*?)(?:Clicca|BORSELLINO TICKET|</h5>)""",
         setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
     )
-    private val ACTIVATION_OK = Regex("""Validazione ticket EFFETTUATA""", RegexOption.IGNORE_CASE)
+    // The engine has used at least two different success phrasings in the wild
+    // ("Validazione ticket EFFETTUATA" and "Validazione effettuata con successo"); match either.
+    private val ACTIVATION_OK = Regex(
+        """Validazione\s+(?:ticket\s+)?effettuat[ao](?:\s+con\s+successo)?""",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun isLoggedIn(html: String): Boolean = HELLO.containsMatchIn(html)
 

@@ -134,6 +134,15 @@ class TrottaHtmlTest {
     }
 
     @Test
+    fun `recognises the engine's real confirmation wording`() {
+        // the live engine says "Validazione effettuata con successo", not the
+        // "Validazione ticket EFFETTUATA" that attiva_confermata.html guessed
+        val confirmed = fixture("attiva_confermata_reale.html")
+        assertTrue(TrottaHtml.activationConfirmed(confirmed))
+        assertNull(TrottaHtml.activationFailure(confirmed))
+    }
+
+    @Test
     fun `a wallet page is neither a confirmation nor a refusal`() {
         val wallet = fixture("booking_attivi.html")
         assertFalse(TrottaHtml.activationConfirmed(wallet))
