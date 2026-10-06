@@ -134,6 +134,18 @@ class TrottaHtmlTest {
     }
 
     @Test
+    fun `reads the print GUID of an already-active ticket`() {
+        // once a ticket is ATTIVO the "Attiva(...)" onclick is gone; the GUID has to
+        // come from the braced id in the VISUALIZZA / stampa.aspx link instead
+        val tickets = TrottaHtml.tickets(fixture("booking_attivi_ticket_attivo.html"))
+        assertEquals(1, tickets.size)
+        val ticket = tickets.first()
+        assertEquals(TicketStatus.ACTIVE, ticket.status)
+        assertEquals("cccccccc-0000-0000-0000-000000000003", ticket.guid)
+        assertFalse(ticket.canActivate)
+    }
+
+    @Test
     fun `recognises the engine's real confirmation wording`() {
         // the live engine says "Validazione effettuata con successo", not the
         // "Validazione ticket EFFETTUATA" that attiva_confermata.html guessed
