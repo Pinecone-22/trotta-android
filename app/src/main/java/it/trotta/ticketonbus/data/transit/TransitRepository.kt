@@ -17,7 +17,7 @@ class TransitRepository(private val assets: AssetManager) {
         fun parse(root: JSONObject): TransitDataset {
             val networks = root.optJSONArray("networks").objectList().map { n ->
                 val networkId = n.getString("id")
-                val stops = n.optJSONArray("stops").objectList().map { s ->
+                val stops = mergeDuplicateStops(n.optJSONArray("stops").objectList().map { s ->
                     TransitStop(
                         id = s.getString("id"),
                         name = s.getString("name"),
@@ -28,7 +28,7 @@ class TransitRepository(private val assets: AssetManager) {
                         lines = s.optJSONArray("lines").stringList(),
                         networkId = networkId,
                     )
-                }
+                })
                 val lines = n.optJSONArray("lines").objectList().map { l ->
                     val lineId = l.getString("id")
                     val services = l.optJSONArray("services").objectList().map { svc ->
@@ -75,6 +75,32 @@ class TransitRepository(private val assets: AssetManager) {
                 generatedAt = root.optString("generatedAt"),
                 attribution = root.optString("attribution"),
                 networks = networks,
+            )
+        }
+
+        /**
+         * The bundled dataset contains a few stops that appear twice under the same id (the same
+         * physical stop spelled slightly differently, each one listing only some of its lines).
+         * Keep one entry per id: first spelling wins, lines are merged and an exact position wins
+         * over an approximate one.
+         */
+        internal fun mergeDuplicateStops(stops: List<TransitStop>): List<TransitStop> {
+            val byId = LinkedHashMap<String, TransitStop>()
+            for (stop in stops) {
+                val existing = byId[stop.id]
+                byId[stop.id] = if (existing == null) stop else existing.mergedWith(stop)
+            }
+            return byId.values.toList()
+        }
+
+        private fun TransitStop.mergedWith(other: TransitStop): TransitStop {
+            val exact = if (approx && !other.approx) other else this
+            return copy(
+                lat = exact.lat,
+                lon = exact.lon,
+                approx = approx && other.approx,
+                code = code.ifBlank { other.code },
+                lines = (lines + other.lines).distinct(),
             )
         }
 

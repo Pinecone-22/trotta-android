@@ -108,16 +108,24 @@ private fun GoogleMapView(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, mapView) {
         val view = mapView ?: return@DisposableEffect onDispose { }
+        // the observer replays the owner's current state, so the view catches up on start/resume
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_START -> view.onStart()
                 Lifecycle.Event.ON_RESUME -> view.onResume()
                 Lifecycle.Event.ON_PAUSE -> view.onPause()
-                Lifecycle.Event.ON_DESTROY -> view.onDestroy()
+                Lifecycle.Event.ON_STOP -> view.onStop()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            // the composable can leave the screen while the activity lives on
+            view.onPause()
+            view.onStop()
+            view.onDestroy()
+        }
     }
 
     LaunchedEffect(mapState.value, pins, routes) {
@@ -186,7 +194,11 @@ private fun OsmdroidMapView(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.onPause()
+            mapView.onDetach()
+        }
     }
 
     AndroidView(

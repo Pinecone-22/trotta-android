@@ -10,6 +10,7 @@ import it.trotta.ticketonbus.data.transit.GeoPoint
 import it.trotta.ticketonbus.data.transit.LocationProvider
 import it.trotta.ticketonbus.data.transit.NearbyStop
 import it.trotta.ticketonbus.data.transit.Reach
+import it.trotta.ticketonbus.data.transit.ReachInfo
 import it.trotta.ticketonbus.data.transit.TransitLine
 import it.trotta.ticketonbus.data.transit.TransitNetwork
 import it.trotta.ticketonbus.data.transit.TransitRepository
@@ -40,10 +41,13 @@ data class TransitUiState(
     val location: GeoPoint? = null,
     val locating: Boolean = false,
     val locationDenied: Boolean = false,
+
+    /** Bumped each time the UI should show the system location-permission dialog. */
+    val permissionRequests: Int = 0,
     val message: UiMessage? = null,
 
     val favourites: Set<String> = emptySet(),
-    val now: LocalDateTime = LocalDateTime.now(),
+    val now: LocalDateTime = Departures.nowDefault(),
 
     val networkPinned: Boolean = false,
 
@@ -80,10 +84,12 @@ class TransitViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             while (true) {
                 delay(30_000)
-                _state.update { it.copy(now = LocalDateTime.now()) }
+                refreshNow()
             }
         }
     }
+
+    fun refreshNow() = _state.update { it.copy(now = Departures.nowDefault()) }
 
     val network: TransitNetwork?
         get() = _state.value.networks.firstOrNull { it.id == _state.value.networkId }
@@ -105,13 +111,17 @@ class TransitViewModel(app: Application) : AndroidViewModel(app) {
         val q = _state.value.query.trim().lowercase()
         if (q.isEmpty()) return net.stops.sortedBy { it.name.lowercase() }
         return net.stops
-            .filter { it.name.lowercase().contains(q) || it.code.contains(q) || it.lines.any { l -> l.lowercase() == q } }
+            .filter {
+                it.name.lowercase().contains(q) ||
+                    it.code.lowercase().contains(q) ||
+                    it.lines.any { l -> l.lowercase() == q }
+            }
             .sortedBy { it.name.lowercase() }
     }
 
-    fun reachSummary(stop: TransitStop): String? {
+    fun reachInfo(stop: TransitStop): ReachInfo? {
         val loc = _state.value.location ?: return null
-        return Reach.summary(loc.lat, loc.lon, stop)
+        return Reach.info(loc.lat, loc.lon, stop)
     }
 
     fun reachLine(stop: TransitStop): List<GeoPoint> {
@@ -140,6 +150,8 @@ class TransitViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openStop(stopId: String) {
+        val current = _state.value
+        if (current.screen == TransitScreen.STOP && current.stopId == stopId) return
         push()
         _state.update { it.copy(screen = TransitScreen.STOP, stopId = stopId) }
     }
@@ -193,9 +205,12 @@ class TransitViewModel(app: Application) : AndroidViewModel(app) {
 
     fun requestLocation() {
         if (!locationProvider.hasPermission()) {
-            _state.update { it.copy(locationDenied = true) }
+            // ask again: the user may have denied only once, and the system dialog is a no-op
+            // if the permission is permanently denied
+            _state.update { it.copy(locationDenied = true, permissionRequests = it.permissionRequests + 1) }
             return
         }
+        if (_state.value.locating) return
         viewModelScope.launch {
             _state.update { it.copy(locating = true, locationDenied = false) }
             val fix = locationProvider.awaitLocation()

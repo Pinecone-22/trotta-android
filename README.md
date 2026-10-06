@@ -20,8 +20,8 @@ Il file `app/src/main/assets/transit.json` è incluso nell'APK e non richiede co
 
 | Rete | Fermate | Linee | Corse |
 | --- | --- | --- | --- |
-| Fiumicino | 411 | 18 | 108 |
-| Campobasso | 362 | 33 | 119 |
+| Fiumicino | 379 | 18 | 108 |
+| Campobasso | 324 | 33 | 119 |
 
 Le fermate, l'ordine delle fermate, i giorni di servizio e gli orari di partenza provengono dalle pagine ufficiali delle linee invernali ed estive e dai PDF pubblicati dal gestore. Le coordinate delle fermate vengono da OpenStreetMap; quando un nome non è geolocalizzabile la posizione è interpolata lungo il percorso tra le fermate vicine e la fermata è segnalata come approssimativa.
 

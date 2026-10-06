@@ -7,6 +7,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.MonthDay
+import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan2
@@ -44,10 +45,8 @@ object Geo {
         return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
     }
 
-    fun bearingLabel(degrees: Double): String {
-        val dirs = listOf("nord", "nord-est", "est", "sud-est", "sud", "sud-ovest", "ovest", "nord-ovest")
-        return dirs[((degrees / 45.0).roundToInt()) % 8]
-    }
+    /** 0 = north, 1 = north-east, 2 = east ... 7 = north-west. */
+    fun compassIndex(degrees: Double): Int = (((degrees % 360.0) + 360.0) % 360.0 / 45.0).roundToInt() % 8
 
     fun walkMinutes(distanceMeters: Double): Int =
         (distanceMeters * 1.25 / 80.0).roundToInt().coerceAtLeast(1)
@@ -84,20 +83,23 @@ object Departures {
         limit: Int = 8,
     ): List<Departure> {
         val result = ArrayList<Departure>()
-        for (offset in 0..1) {
+        val nowMinutes = now.toLocalTime().toSecondOfDay() / 60
+        // offset -1 picks up yesterday's late runs, which the timetables write as 24:xx..29:xx
+        for (offset in -1..1) {
             val day = now.toLocalDate().plusDays(offset.toLong())
             val types = dayTypesFor(day)
             val season = Season.current(day)
-            val floor = if (offset == 0) now.toLocalTime().toSecondOfDay() / 60 else -1
             network.lines.forEach { line ->
                 line.services
                     .filter { it.dayType in types && (it.season == Season.ANNUALE || it.season == season) }
                     .forEach { svc ->
-                    val at = svc.stops.firstOrNull { it.stopId == stopId } ?: return@forEach
-                    val isTerminus = svc.stops.firstOrNull()?.stopId == stopId
-                    at.times.forEach { raw ->
-                        val minutes = parseMinutes(raw) ?: return@forEach
-                        if (minutes >= floor) {
+                        val at = svc.stops.firstOrNull { it.stopId == stopId } ?: return@forEach
+                        val isTerminus = svc.stops.firstOrNull()?.stopId == stopId
+                        at.times.forEach { raw ->
+                            val parsed = parseMinutes(raw) ?: return@forEach
+                            val minutes = if (offset < 0) parsed - MINUTES_PER_DAY else parsed
+                            if (minutes < 0) return@forEach
+                            if (offset <= 0 && minutes < nowMinutes) return@forEach
                             result += Departure(
                                 lineId = line.id,
                                 lineName = line.name,
@@ -106,15 +108,14 @@ object Departures {
                                 serviceId = svc.id,
                                 timeMinutes = minutes,
                                 time = formatMinutes(minutes),
-                                dayOffset = offset,
+                                dayOffset = maxOf(offset, 0),
                                 estimated = at.estimated,
                                 fromTerminus = isTerminus || !at.estimated,
                             )
                         }
                     }
-                }
             }
-            if (result.size >= limit) break
+            if (offset >= 0 && result.size >= limit) break
         }
         return result.sortedWith(compareBy({ it.dayOffset }, { it.timeMinutes }, { it.estimated }))
             .distinctBy { "${it.lineId}|${it.timeMinutes}|${it.dayOffset}" }
@@ -161,15 +162,31 @@ object Departures {
         return LocalDate.of(year, month, day).plusDays(1)
     }
 
-    fun nowDefault(): LocalDateTime = LocalDateTime.now()
+    /** Timetables are published in local Italian time, whatever the time zone of the device. */
+    val SERVICE_ZONE: ZoneId = ZoneId.of("Europe/Rome")
+
+    private const val MINUTES_PER_DAY = 24 * 60
+
+    fun nowDefault(): LocalDateTime = LocalDateTime.now(SERVICE_ZONE)
+}
+
+data class ReachInfo(
+    val distanceMeters: Double,
+    val bearingDegrees: Double,
+    val walkMinutes: Int,
+) {
+    val compassIndex: Int get() = Geo.compassIndex(bearingDegrees)
+    val distanceLabel: String get() = Geo.formatDistance(distanceMeters)
 }
 
 object Reach {
-    fun summary(fromLat: Double, fromLon: Double, stop: TransitStop): String {
+    fun info(fromLat: Double, fromLon: Double, stop: TransitStop): ReachInfo {
         val distance = Geo.distanceMeters(fromLat, fromLon, stop.lat, stop.lon)
-        val bearing = Geo.bearingLabel(Geo.bearingDegrees(fromLat, fromLon, stop.lat, stop.lon))
-        val walk = Geo.walkMinutes(distance)
-        return "${Geo.formatDistance(distance)} verso $bearing, circa $walk min a piedi"
+        return ReachInfo(
+            distanceMeters = distance,
+            bearingDegrees = Geo.bearingDegrees(fromLat, fromLon, stop.lat, stop.lon),
+            walkMinutes = Geo.walkMinutes(distance),
+        )
     }
 
     fun line(fromLat: Double, fromLon: Double, stop: TransitStop): List<GeoPoint> =

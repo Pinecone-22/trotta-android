@@ -129,10 +129,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
             .onSuccess { (tickets, history, cart) ->
                 _state.update {
-                    it.copy(tickets = tickets, history = history, cart = cart, refreshing = false)
+                    // the user may have signed out or switched service while this was in flight
+                    if (it.account == null || it.tenant != tenant) {
+                        it.copy(refreshing = false)
+                    } else {
+                        it.copy(tickets = tickets, history = history, cart = cart, refreshing = false)
+                    }
                 }
             }
-            .onFailure { e -> _state.update { it.copy(refreshing = false, error = describe(e)) } }
+            .onFailure { e ->
+                _state.update {
+                    val stale = it.account == null || it.tenant != tenant
+                    it.copy(refreshing = false, error = if (stale) it.error else describe(e))
+                }
+            }
     }
 
     fun reserve(count: Int, onReady: (PaymentHandoff) -> Unit) = viewModelScope.launch {

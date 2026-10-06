@@ -74,7 +74,7 @@ class TrottaApi(private val session: SessionStore) {
             val rowId = ticket.rowId ?: throw TrottaException("Ticket non attivabile.")
             val guid = ticket.guid ?: throw TrottaException("Ticket non attivabile.")
             val bus = busNumber.trim()
-            if (!bus.matches(Regex("""\d{1,4}"""))) {
+            if (!BUS_NUMBER.matches(bus)) {
                 throw TrottaException("Inserisci il numero del bus: solo cifre, da 1 a 4.")
             }
 
@@ -140,6 +140,7 @@ class TrottaApi(private val session: SessionStore) {
 
     companion object {
         const val ORIGIN = "https://ticketonbus.trotta.it/"
+        private val BUS_NUMBER = Regex("""\d{1,4}""")
         private const val ACCEPT_LANGUAGE = "it-IT,it;q=0.9,en;q=0.8"
     }
 }

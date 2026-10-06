@@ -69,12 +69,13 @@ fun TransitApp(state: TransitUiState, vm: TransitViewModel, onOpenUrl: (String) 
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { result -> vm.onPermissionResult(result.values.any { it }) }
 
+    val permissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
     LaunchedEffect(Unit) {
-        if (state.location == null && !state.locationDenied) {
-            permissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-            )
-        }
+        if (state.location == null && !state.locationDenied) permissionLauncher.launch(permissions)
+    }
+    // a tap on "Use my location" while the permission is missing asks for it again
+    LaunchedEffect(state.permissionRequests) {
+        if (state.permissionRequests > 0) permissionLauncher.launch(permissions)
     }
 
     val message = state.message?.resolve()
@@ -160,7 +161,9 @@ private fun NearbyScreen(state: TransitUiState, vm: TransitViewModel, onExit: ()
                 favourites.forEach { stop ->
                     StopRow(
                         stop = stop,
-                        subtitle = stop.lines.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "Linea $it" },
+                        subtitle = stop.lines.takeIf { it.isNotEmpty() }
+                            ?.map { stringResource(R.string.line_label, it) }
+                            ?.joinToString(" · "),
                         departures = vm.departures(stop.id, 2),
                         nowMinutes = nowMinutes,
                         onClick = { vm.openStop(stop.id) },
@@ -301,7 +304,9 @@ private fun StopsScreen(state: TransitUiState, vm: TransitViewModel) {
                     stop = stop,
                     subtitle = listOfNotNull(
                         distance,
-                        stop.lines.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "Linea $it" },
+                        stop.lines.takeIf { it.isNotEmpty() }
+                            ?.map { stringResource(R.string.line_label, it) }
+                            ?.joinToString(" · "),
                     ).joinToString(" · ").ifBlank { null },
                     departures = emptyList(),
                     nowMinutes = nowMinutes,
@@ -382,13 +387,14 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
     }
     val lines = vm.network?.lines.orEmpty().filter { it.id in stop.lines }
     val departures = vm.departures(stop.id, 24)
-    val reach = vm.reachSummary(stop)
+    val reach = vm.reachInfo(stop)
     val path = vm.reachLine(stop)
     val user = state.location
     val nowMinutes = state.now.hour * 60 + state.now.minute
     val today = departures.filter { it.dayOffset == 0 }
     val tomorrow = departures.filter { it.dayOffset > 0 }
     val isFavourite = stop.id in state.favourites
+    val youAreHere = stringResource(R.string.map_you_are_here)
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(
@@ -422,9 +428,9 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (stop.code.isNotBlank()) LineChip("Cod. ${stop.code}")
+                if (stop.code.isNotBlank()) LineChip(stringResource(R.string.stop_code_label, stop.code))
                 if (stop.approx) ChipWarning(stringResource(R.string.chip_approx))
-                stop.lines.forEach { LineChip("Linea $it") }
+                stop.lines.forEach { LineChip(stringResource(R.string.line_label, it)) }
             }
 
             Text(
@@ -461,7 +467,17 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
                 fontWeight = FontWeight.SemiBold,
             )
             if (user != null) {
-                Text(reach.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                if (reach != null) {
+                    Text(
+                        stringResource(
+                            R.string.reach_summary,
+                            reach.distanceLabel,
+                            stringResource(COMPASS_LABELS[reach.compassIndex]),
+                            reach.walkMinutes,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             } else {
                 Text(
                     stringResource(R.string.transit_reach_prompt),
@@ -473,7 +489,7 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
                 }
             }
             val pins = buildList {
-                if (user != null) add(MapPin("me", user.lat, user.lon, "Tu sei qui", isUser = true))
+                if (user != null) add(MapPin("me", user.lat, user.lon, youAreHere, isUser = true))
                 add(
                     MapPin(
                         id = stop.id,
@@ -534,7 +550,7 @@ private fun DepartureRow(departure: Departure, nowMinutes: Int) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    LineChip("Linea ${departure.lineId}")
+                    LineChip(stringResource(R.string.line_label, departure.lineId))
                     Spacer(Modifier.width(8.dp))
                     Text(departure.time, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (departure.dayOffset > 0) {
@@ -826,6 +842,7 @@ private fun MapScreen(state: TransitUiState, vm: TransitViewModel) {
     val user = state.location
     val lines = network?.lines.orEmpty()
     val selected = lines.firstOrNull { it.id == state.mapLineId }
+    val youAreHere = stringResource(R.string.map_you_are_here)
     val visibleStops = if (user != null) vm.nearby(120).map { it.stop } else network?.stops.orEmpty()
     val center = user?.let { it.lat to it.lon }
         ?: visibleStops.firstOrNull()?.let { it.lat to it.lon }
@@ -866,12 +883,14 @@ private fun MapScreen(state: TransitUiState, vm: TransitViewModel) {
             }
         }
 
-        val routes = selected?.let { line ->
-            val points = vm.lineRoute(line)
-            if (points.size >= 2) listOf(MapRoute(points, lineColor(0), 11f)) else emptyList()
-        }.orEmpty()
-        AppMapView(
-            pins = visibleStops.map { stop ->
+        val routes = remember(selected?.id, state.networkId) {
+            selected?.let { line ->
+                val points = vm.lineRoute(line)
+                if (points.size >= 2) listOf(MapRoute(points, lineColor(0), 11f)) else emptyList()
+            }.orEmpty()
+        }
+        val pins = remember(state.location, state.networkId, state.now, youAreHere) {
+            visibleStops.map { stop ->
                 MapPin(
                     id = stop.id,
                     lat = stop.lat,
@@ -879,7 +898,10 @@ private fun MapScreen(state: TransitUiState, vm: TransitViewModel) {
                     title = stop.name,
                     snippet = vm.departures(stop.id, 1).firstOrNull()?.let { "L${it.lineId} · ${it.time}" },
                 )
-            } + listOfNotNull(user?.let { MapPin("me", it.lat, it.lon, "Tu sei qui", isUser = true) }),
+            } + listOfNotNull(user?.let { MapPin("me", it.lat, it.lon, youAreHere, isUser = true) })
+        }
+        AppMapView(
+            pins = pins,
             routes = routes,
             center = center,
             zoom = if (selected != null) 12.5 else 13.0,
@@ -970,6 +992,11 @@ private fun ChipWarning(label: String) {
         )
     }
 }
+
+private val COMPASS_LABELS = listOf(
+    R.string.compass_n, R.string.compass_ne, R.string.compass_e, R.string.compass_se,
+    R.string.compass_s, R.string.compass_sw, R.string.compass_w, R.string.compass_nw,
+)
 
 private val LINE_COLORS = listOf(
     0xFF1565C0, 0xFFC62828, 0xFF2E7D32, 0xFF6A1B9A,

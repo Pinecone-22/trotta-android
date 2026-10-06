@@ -1,5 +1,6 @@
 package it.trotta.ticketonbus.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -61,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -93,6 +96,10 @@ fun TicketOnBusApp(
     }
 
     val showNav = state.screen in setOf(Screen.HOME, Screen.WALLET, Screen.TRANSIT, Screen.INFO)
+
+    // the transit section installs its own handler, which has priority while it is shown
+    val home = if (state.account != null) Screen.HOME else Screen.LOGIN
+    BackHandler(enabled = state.screen != home && state.screen != Screen.TRANSIT) { vm.go(home) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -223,7 +230,7 @@ private fun LoginScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) ->
                 label = { Text(stringResource(R.string.field_email)) },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -247,7 +254,8 @@ private fun LoginScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) ->
                         )
                     }
                 },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (!state.busy) vm.login(email, password) }),
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -273,6 +281,23 @@ private fun LoginScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) ->
 
 @Composable
 private fun HomeScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) -> Unit) {
+    var confirmSignOut by remember { mutableStateOf(false) }
+    if (confirmSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            title = { Text(stringResource(R.string.dialog_sign_out_title)) },
+            text = { Text(stringResource(R.string.dialog_sign_out_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmSignOut = false
+                    vm.logout()
+                }) { Text(stringResource(R.string.action_sign_out)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -285,7 +310,7 @@ private fun HomeScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) -> 
                 IconButton(onClick = { vm.refresh() }) {
                     Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_refresh))
                 }
-                IconButton(onClick = { vm.logout() }) {
+                IconButton(onClick = { confirmSignOut = true }) {
                     Icon(Icons.Filled.ExitToApp, contentDescription = stringResource(R.string.action_sign_out))
                 }
             },
@@ -566,7 +591,8 @@ private fun VehicleCodeDialog(
                     onValueChange = { input -> if (input.length <= 4 && input.all(Char::isDigit)) bus = input },
                     label = { Text(stringResource(R.string.field_vehicle_code)) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (bus.isNotBlank()) onConfirm(bus) }),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
