@@ -12,6 +12,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import it.trotta.ticketonbus.BuildConfig
 import it.trotta.ticketonbus.data.GoogleAccount
 import it.trotta.ticketonbus.data.googleAccountOf
+import kotlin.coroutines.cancellation.CancellationException
 
 class GoogleSignInException(
     val kind: Kind,
@@ -46,6 +47,8 @@ object GoogleSignIn {
             throw GoogleSignInException(GoogleSignInException.Kind.NO_ACCOUNT, cause = e)
         } catch (e: GetCredentialException) {
             throw GoogleSignInException(GoogleSignInException.Kind.FAILED, e.message, e)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw GoogleSignInException(GoogleSignInException.Kind.FAILED, e.message, e)
         }

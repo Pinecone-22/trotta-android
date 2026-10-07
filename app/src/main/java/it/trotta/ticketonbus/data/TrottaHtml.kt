@@ -10,6 +10,7 @@ internal object TrottaHtml {
     private const val LOOP_END = "FINE LOOP"
 
     private val ACTIVATE = Regex("""Attiva\(\s*'(\d+)'\s*,\s*'([^']+)'\s*,\s*(\d+)""")
+    private val GUID = Regex("""[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}""")
     private val LOGIN_ERROR = Regex("""Area Clienti\s*(.*?)\s*Riprova""", RegexOption.DOT_MATCHES_ALL)
     private val HELLO = Regex("""Benvenuto,(?:&nbsp;|\s)*([^<.]+)""")
     private val RESERVED_FOR = Regex("""Area riservata di:\s*([^<&]+)""")
@@ -20,7 +21,12 @@ internal object TrottaHtml {
         """NON EFFETTUATA\.?(.*?)(?:Clicca|BORSELLINO TICKET|</h5>)""",
         setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
     )
-    private val ACTIVATION_OK = Regex("""Validazione ticket EFFETTUATA""", RegexOption.IGNORE_CASE)
+    // The engine has used at least two different success phrasings in the wild
+    // ("Validazione ticket EFFETTUATA" and "Validazione effettuata con successo"); match either.
+    private val ACTIVATION_OK = Regex(
+        """Validazione\s+(?:ticket\s+)?effettuat[ao](?:\s+con\s+successo)?""",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun isLoggedIn(html: String): Boolean = HELLO.containsMatchIn(html)
 
@@ -93,18 +99,23 @@ internal object TrottaHtml {
         val number = if (delAt > 0) rawNumber.substring(0, delAt).trim() else rawNumber
         val issuedOn = if (delAt > 0) rawNumber.substring(delAt + 5).trim() else null
 
-        val onclick = Jsoup.parseBodyFragment(fragment)
-            .select("a[onclick]")
+        val doc = Jsoup.parseBodyFragment(fragment)
+        val onclick = doc.select("a[onclick]")
             .firstOrNull { it.attr("onclick").contains("Attiva") }
             ?.attr("onclick")
         val activate = onclick?.let { ACTIVATE.find(it) }
+
+        // once a ticket leaves NOT_ACTIVE the "Attiva(...)" link is replaced by a direct
+        // link to the printable ticket; that is the only place its GUID still appears
+        val printHref = doc.select("a[href*=stampa.aspx]").firstOrNull()?.attr("href")
+        val guid = activate?.groupValues?.get(2) ?: printHref?.let { GUID.find(it)?.value }
 
         val minutes = activate?.groupValues?.get(3)?.toIntOrNull()
             ?: fields["validità"]?.let { FIRST_INT.find(it)?.groupValues?.get(1)?.toIntOrNull() }
 
         return Ticket(
             rowId = activate?.groupValues?.get(1)?.toLongOrNull(),
-            guid = activate?.groupValues?.get(2),
+            guid = guid,
             number = number,
             issuedOn = issuedOn,
             bookedAt = fields["data prenotazione"].orNullIfBlank(),

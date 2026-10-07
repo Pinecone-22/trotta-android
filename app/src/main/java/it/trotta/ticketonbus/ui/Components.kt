@@ -45,6 +45,9 @@ import java.time.format.DateTimeFormatter
 
 private val ITALIAN_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 
+// the site prints validity times in Italian local time, wherever the phone happens to be
+private val SITE_ZONE: ZoneId = ZoneId.of("Europe/Rome")
+
 fun parseItalianDateTime(raw: String?): LocalDateTime? =
     raw?.trim()?.takeIf { it.isNotEmpty() }
         ?.let { runCatching { LocalDateTime.parse(it, ITALIAN_DATE) }.getOrNull() }
@@ -131,15 +134,17 @@ private fun InfoRow(label: String, value: String) {
 private fun rememberRemaining(validTo: String?): String? {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     val end = remember(validTo) { parseItalianDateTime(validTo) }
-    LaunchedEffect(end) {
-        if (end == null) return@LaunchedEffect
+    val endMillis = end?.atZone(SITE_ZONE)?.toInstant()?.toEpochMilli()
+    LaunchedEffect(endMillis) {
+        if (endMillis == null) return@LaunchedEffect
         while (true) {
             now = System.currentTimeMillis()
+            if (now >= endMillis) break
             delay(1_000)
         }
     }
-    if (end == null) return null
-    val remaining = end.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() - now
+    if (endMillis == null) return null
+    val remaining = endMillis - now
     if (remaining <= 0) return stringResource(R.string.expired_label)
     val totalSeconds = remaining / 1000
     val hours = totalSeconds / 3600

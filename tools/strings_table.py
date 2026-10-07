@@ -507,6 +507,37 @@ S.update({
         "ticketonbus.trotta.it rămâne separat."),
 })
 
+S.update({
+    "line_label": ("Line %1$s", "Linea %1$s", "Línea %1$s", "Ligne %1$s", "Linie %1$s", "Linia %1$s"),
+    "stop_code_label": ("Code %1$s", "Cod. %1$s", "Cód. %1$s", "Code %1$s", "Code %1$s", "Cod %1$s"),
+    "map_you_are_here": ("You are here", "Tu sei qui", "Estás aquí", "Vous êtes ici", "Du bist hier",
+                         "Ești aici"),
+    "reach_summary": (
+        "%1$s towards %2$s, about %3$d min on foot",
+        "%1$s verso %2$s, circa %3$d min a piedi",
+        "%1$s hacia el %2$s, unos %3$d min a pie",
+        "%1$s vers le %2$s, environ %3$d min à pied",
+        "%1$s Richtung %2$s, etwa %3$d Min. zu Fuß",
+        "%1$s spre %2$s, aproximativ %3$d min pe jos"),
+    "compass_n": ("north", "nord", "norte", "nord", "Norden", "nord"),
+    "compass_ne": ("north-east", "nord-est", "noreste", "nord-est", "Nordosten", "nord-est"),
+    "compass_e": ("east", "est", "este", "est", "Osten", "est"),
+    "compass_se": ("south-east", "sud-est", "sureste", "sud-est", "Südosten", "sud-est"),
+    "compass_s": ("south", "sud", "sur", "sud", "Süden", "sud"),
+    "compass_sw": ("south-west", "sud-ovest", "suroeste", "sud-ouest", "Südwesten", "sud-vest"),
+    "compass_w": ("west", "ovest", "oeste", "ouest", "Westen", "vest"),
+    "compass_nw": ("north-west", "nord-ovest", "noroeste", "nord-ouest", "Nordwesten", "nord-vest"),
+    "dialog_sign_out_title": ("Sign out?", "Uscire?", "¿Cerrar sesión?", "Se déconnecter ?", "Abmelden?",
+                              "Te deconectezi?"),
+    "dialog_sign_out_body": (
+        "You will need to sign in again to see your tickets.",
+        "Dovrai accedere di nuovo per vedere i tuoi ticket.",
+        "Tendrás que iniciar sesión de nuevo para ver tus billetes.",
+        "Vous devrez vous reconnecter pour voir vos billets.",
+        "Zum Anzeigen der Tickets ist eine erneute Anmeldung nötig.",
+        "Va trebui să te autentifici din nou pentru a-ți vedea biletele."),
+})
+
 P = {
     "n_tickets": (
         ("%1$d ticket", "%1$d tickets"), ("%1$d ticket", "%1$d ticket"), ("%1$d billete", "%1$d billetes"),

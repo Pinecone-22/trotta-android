@@ -119,8 +119,10 @@ class TransitDatasetTest {
         assertEquals("300 m", Geo.formatDistance(300.0))
         assertEquals("1.2 km", Geo.formatDistance(1234.0))
         assertTrue(Geo.walkMinutes(800.0) >= 1)
-        assertTrue(Geo.bearingLabel(0.0) == "nord")
-        assertTrue(Geo.bearingLabel(90.0) == "est")
+        assertEquals(0, Geo.compassIndex(0.0))
+        assertEquals(2, Geo.compassIndex(90.0))
+        assertEquals(0, Geo.compassIndex(359.0))
+        assertEquals(7, Geo.compassIndex(315.0))
     }
 
     private fun syntheticNetwork(): TransitNetwork {
@@ -185,13 +187,57 @@ class TransitDatasetTest {
     }
 
     @Test
-    fun `reach summary reports distance and walking time`() {
+    fun `reach info reports distance bearing and walking time`() {
         val stop = TransitStop("a", "Stop a", 41.5610, 14.6630, false, "", listOf("1"), "test")
-        val summary = Reach.summary(41.5603, 14.6627, stop)
-        assertTrue(summary.contains("verso"))
-        assertTrue(summary.contains("a piedi"))
+        val info = Reach.info(41.5603, 14.6627, stop)
+        assertTrue(info.distanceMeters in 50.0..150.0)
+        assertEquals(0, info.compassIndex)
+        assertTrue(info.walkMinutes >= 1)
+        assertTrue(info.distanceLabel.endsWith(" m"))
         val line = Reach.line(41.5603, 14.6627, stop)
         assertEquals(2, line.size)
         assertTrue(Reach.googleMapsUrl(41.5603, 14.6627, stop).startsWith("https://www.google.com/maps/dir/"))
+    }
+
+    @Test
+    fun `bundled dataset has one stop per id`() {
+        dataset().networks.forEach { network ->
+            val ids = network.stops.map { it.id }
+            assertEquals("duplicate stop ids in ${network.id}", ids.size, ids.toSet().size)
+        }
+    }
+
+    @Test
+    fun `duplicate stops are merged keeping every line and the exact position`() {
+        fun stop(name: String, lat: Double, approx: Boolean, vararg lines: String) =
+            TransitStop("x", name, lat, 14.0, approx, "", lines.toList(), "test")
+
+        val merged = TransitRepository.mergeDuplicateStops(
+            listOf(
+                stop("Colle - Cava", 41.1, approx = true, "7P"),
+                stop("Colle Cava", 41.2, approx = false, "7", "7P"),
+                stop("Other", 41.3, approx = false, "3").copy(id = "y"),
+            ),
+        )
+        assertEquals(2, merged.size)
+        val colle = merged.first { it.id == "x" }
+        assertEquals("Colle - Cava", colle.name)
+        assertEquals(listOf("7P", "7"), colle.lines)
+        assertEquals(41.2, colle.lat, 0.0)
+        assertFalse(colle.approx)
+    }
+
+    @Test
+    fun `late runs written as 24h carry over after midnight`() {
+        val net = syntheticNetwork()
+        // Monday's 24:00 run at stop b happens at 00:00 on Tuesday, shown as a run of today
+        val atMidnight = LocalDateTime.of(2026, 9, 22, 0, 0)
+        val carried = Departures.upcoming(net, "b", atMidnight, 3).first()
+        assertEquals("00:00", carried.time)
+        assertEquals(0, carried.dayOffset)
+
+        // once it has gone, the next run is the 06:10 one
+        val later = LocalDateTime.of(2026, 9, 22, 0, 5)
+        assertEquals("06:10", Departures.upcoming(net, "b", later, 3).first().time)
     }
 }

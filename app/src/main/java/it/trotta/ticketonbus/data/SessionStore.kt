@@ -10,18 +10,7 @@ import okhttp3.HttpUrl
 
 class SessionStore(context: Context) : CookieJar {
 
-    private val prefs: SharedPreferences = run {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            "trotta_session",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
-    }
+    private val prefs: SharedPreferences = openPrefs(context)
 
     private val lock = Any()
     private val jar = LinkedHashMap<String, Cookie>()
@@ -57,7 +46,11 @@ class SessionStore(context: Context) : CookieJar {
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
         synchronized(lock) {
-            cookies.forEach { jar[it.name] = it }
+            val now = System.currentTimeMillis()
+            cookies.forEach { cookie ->
+                // a cookie that is already expired is the server asking us to delete it
+                if (cookie.expiresAt <= now) jar.remove(keyOf(cookie)) else jar[keyOf(cookie)] = cookie
+            }
             persist()
         }
     }
@@ -76,6 +69,8 @@ class SessionStore(context: Context) : CookieJar {
         }
     }
 
+    private fun keyOf(c: Cookie) = "${c.name}|${c.domain}|${c.path}"
+
     private fun persist() {
         val blob = jar.values.joinToString("\n") { encode(it) }
         prefs.edit().putString(KEY_COOKIES, blob).apply()
@@ -84,7 +79,7 @@ class SessionStore(context: Context) : CookieJar {
     private fun restore() {
         val blob = prefs.getString(KEY_COOKIES, null) ?: return
         blob.lineSequence().forEach { line ->
-            decode(line)?.let { jar[it.name] = it }
+            decode(line)?.let { jar[keyOf(it)] = it }
         }
     }
 
@@ -119,6 +114,33 @@ class SessionStore(context: Context) : CookieJar {
     }
 
     private companion object {
+        const val FILE = "trotta_session"
+
+        /**
+         * The Keystore master key can become unusable (restored device, security-patch resets, ...),
+         * in which case opening the encrypted file throws on every launch. The session is only a
+         * cache of cookies, so start over with a fresh file instead of crashing.
+         */
+        fun openPrefs(context: Context): SharedPreferences = try {
+            createPrefs(context)
+        } catch (e: Exception) {
+            context.deleteSharedPreferences(FILE)
+            createPrefs(context)
+        }
+
+        private fun createPrefs(context: Context): SharedPreferences {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            return EncryptedSharedPreferences.create(
+                context,
+                FILE,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        }
+
         const val SEP = "\u0001"
         const val KEY_COOKIES = "cookies"
         const val KEY_TENANT = "tenant"

@@ -43,7 +43,8 @@ class MainActivity : ComponentActivity() {
                     transitState = transitState,
                     transitVm = transitVm,
                     onOpenUrl = { url ->
-                        awaitingPayment = true
+                        // only a payment leaves tickets to refresh once the user comes back
+                        awaitingPayment = PAYMENT_HOST in url
                         openExternally(url)
                     },
                     onChangeLanguage = { language ->
@@ -58,10 +59,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        transitVm.refreshNow()
         if (awaitingPayment) {
             awaitingPayment = false
             vm.refresh(showSpinner = false)
         }
+    }
+
+    private companion object {
+        const val PAYMENT_HOST = "payment.trotta.it"
     }
 
     private fun openExternally(url: String) {
