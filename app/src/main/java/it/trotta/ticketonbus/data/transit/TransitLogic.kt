@@ -195,4 +195,13 @@ object Reach {
     fun googleMapsUrl(fromLat: Double, fromLon: Double, stop: TransitStop): String =
         "https://www.google.com/maps/dir/?api=1&origin=$fromLat,$fromLon" +
             "&destination=${stop.lat},${stop.lon}&travelmode=walking"
+
+    /**
+     * Opens Google's own transit directions to this stop, with no origin set so Maps falls
+     * back to the device's current location. For lines whose passage time here is an estimate
+     * (see [it.trotta.ticketonbus.data.transit.StopTime.estimated]), this is the way to check
+     * a real, independently sourced prediction instead of our distance-based guess.
+     */
+    fun transitDirectionsUrl(stop: TransitStop): String =
+        "https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lon}&travelmode=transit"
 }

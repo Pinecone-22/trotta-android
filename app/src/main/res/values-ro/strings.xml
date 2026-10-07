@@ -177,6 +177,7 @@
     <string name="compass_nw">nord-vest</string>
     <string name="dialog_sign_out_title">Te deconectezi?</string>
     <string name="dialog_sign_out_body">Va trebui să te autentifici din nou pentru a-ți vedea biletele.</string>
+    <string name="action_check_live_times">Verifică ora reală pe Google Maps</string>
     <plurals name="n_tickets">
         <item quantity="one">%1$d bilet</item>
         <item quantity="few">%1$d bilete</item>

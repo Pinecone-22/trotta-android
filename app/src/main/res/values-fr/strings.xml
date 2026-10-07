@@ -177,6 +177,7 @@
     <string name="compass_nw">nord-ouest</string>
     <string name="dialog_sign_out_title">Se déconnecter ?</string>
     <string name="dialog_sign_out_body">Vous devrez vous reconnecter pour voir vos billets.</string>
+    <string name="action_check_live_times">Vérifier l\'horaire réel sur Google Maps</string>
     <plurals name="n_tickets">
         <item quantity="one">%1$d billet</item>
         <item quantity="other">%1$d billets</item>

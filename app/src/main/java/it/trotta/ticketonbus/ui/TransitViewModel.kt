@@ -134,6 +134,8 @@ class TransitViewModel(app: Application) : AndroidViewModel(app) {
         return Reach.googleMapsUrl(loc.lat, loc.lon, stop)
     }
 
+    fun transitUrl(stop: TransitStop): String = Reach.transitDirectionsUrl(stop)
+
     fun departures(stopId: String?, limit: Int = 8): List<Departure> {
         val net = network ?: return emptyList()
         val id = stopId ?: return emptyList()

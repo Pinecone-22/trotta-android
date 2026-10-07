@@ -482,6 +482,12 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
             }
             if (departures.any { it.estimated }) {
                 WarningBanner(stringResource(R.string.transit_estimates_banner))
+                OutlinedButton(
+                    onClick = { onOpenUrl(vm.transitUrl(stop)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_check_live_times))
+                }
             }
 
             Text(

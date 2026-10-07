@@ -177,6 +177,7 @@
     <string name="compass_nw">north-west</string>
     <string name="dialog_sign_out_title">Sign out?</string>
     <string name="dialog_sign_out_body">You will need to sign in again to see your tickets.</string>
+    <string name="action_check_live_times">Check the real time on Google Maps</string>
     <plurals name="n_tickets">
         <item quantity="one">%1$d ticket</item>
         <item quantity="other">%1$d tickets</item>

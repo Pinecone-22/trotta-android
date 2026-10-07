@@ -536,6 +536,13 @@ S.update({
         "Vous devrez vous reconnecter pour voir vos billets.",
         "Zum Anzeigen der Tickets ist eine erneute Anmeldung nötig.",
         "Va trebui să te autentifici din nou pentru a-ți vedea biletele."),
+    "action_check_live_times": (
+        "Check the real time on Google Maps",
+        "Controlla l'orario reale su Google Maps",
+        "Consulta el horario real en Google Maps",
+        "Vérifier l'horaire réel sur Google Maps",
+        "Echtzeit auf Google Maps prüfen",
+        "Verifică ora reală pe Google Maps"),
 })
 
 P = {

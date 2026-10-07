@@ -177,6 +177,7 @@
     <string name="compass_nw">Nordwesten</string>
     <string name="dialog_sign_out_title">Abmelden?</string>
     <string name="dialog_sign_out_body">Zum Anzeigen der Tickets ist eine erneute Anmeldung nötig.</string>
+    <string name="action_check_live_times">Echtzeit auf Google Maps prüfen</string>
     <plurals name="n_tickets">
         <item quantity="one">%1$d Ticket</item>
         <item quantity="other">%1$d Tickets</item>

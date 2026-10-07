@@ -200,6 +200,16 @@ class TransitDatasetTest {
     }
 
     @Test
+    fun `transit directions url points at the stop in transit mode with no fixed origin`() {
+        val stop = TransitStop("a", "Stop a", 41.5610, 14.6630, false, "", listOf("1"), "test")
+        val url = Reach.transitDirectionsUrl(stop)
+        assertTrue(url.startsWith("https://www.google.com/maps/dir/"))
+        assertTrue(url.contains("destination=41.561,14.663"))
+        assertTrue(url.contains("travelmode=transit"))
+        assertFalse(url.contains("origin="))
+    }
+
+    @Test
     fun `bundled dataset has one stop per id`() {
         dataset().networks.forEach { network ->
             val ids = network.stops.map { it.id }

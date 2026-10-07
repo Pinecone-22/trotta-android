@@ -177,6 +177,7 @@
     <string name="compass_nw">nord-ovest</string>
     <string name="dialog_sign_out_title">Uscire?</string>
     <string name="dialog_sign_out_body">Dovrai accedere di nuovo per vedere i tuoi ticket.</string>
+    <string name="action_check_live_times">Controlla l\'orario reale su Google Maps</string>
     <plurals name="n_tickets">
         <item quantity="one">%1$d ticket</item>
         <item quantity="other">%1$d ticket</item>
