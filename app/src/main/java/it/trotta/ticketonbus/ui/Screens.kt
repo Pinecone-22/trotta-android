@@ -1,6 +1,14 @@
 package it.trotta.ticketonbus.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -129,22 +137,35 @@ fun TicketOnBusApp(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            when (state.screen) {
-                Screen.LOGIN -> LoginScreen(state, vm, onOpenUrl)
-                Screen.HOME -> HomeScreen(state, vm, onOpenUrl)
-                Screen.BUY -> BuyScreen(state, vm, onOpenUrl)
-                Screen.WALLET -> WalletScreen(state, vm, onOpenUrl)
-                Screen.HISTORY -> HistoryScreen(state, vm, onOpenUrl)
-                Screen.CART -> CartScreen(state, vm, onOpenUrl)
-                Screen.INFO -> InfoScreen(state, vm, onChangeLanguage)
-                Screen.TRANSIT -> TransitApp(
-                    state = transitState,
-                    vm = transitVm,
-                    onOpenUrl = onOpenUrl,
-                    onExit = { vm.go(if (state.account != null) Screen.HOME else Screen.LOGIN) },
-                )
+            AnimatedContent(
+                targetState = state.screen,
+                transitionSpec = {
+                    (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 16 })
+                        .togetherWith(fadeOut(tween(120)))
+                },
+                label = "screen",
+            ) { screen ->
+                when (screen) {
+                    Screen.LOGIN -> LoginScreen(state, vm, onOpenUrl)
+                    Screen.HOME -> HomeScreen(state, vm, onOpenUrl)
+                    Screen.BUY -> BuyScreen(state, vm, onOpenUrl)
+                    Screen.WALLET -> WalletScreen(state, vm, onOpenUrl)
+                    Screen.HISTORY -> HistoryScreen(state, vm, onOpenUrl)
+                    Screen.CART -> CartScreen(state, vm, onOpenUrl)
+                    Screen.INFO -> InfoScreen(state, vm, onChangeLanguage)
+                    Screen.TRANSIT -> TransitApp(
+                        state = transitState,
+                        vm = transitVm,
+                        onOpenUrl = onOpenUrl,
+                        onExit = { vm.go(if (state.account != null) Screen.HOME else Screen.LOGIN) },
+                    )
+                }
             }
-            if (state.busy) {
+            AnimatedVisibility(
+                visible = state.busy,
+                enter = fadeIn(tween(150)),
+                exit = fadeOut(tween(150)),
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -473,11 +494,23 @@ private fun BuyScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) -> U
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = count.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
+                        AnimatedContent(
+                            targetState = count,
+                            transitionSpec = {
+                                val up = targetState > initialState
+                                (slideInVertically(tween(180)) { h -> if (up) h else -h } + fadeIn(tween(180)))
+                                    .togetherWith(
+                                        slideOutVertically(tween(180)) { h -> if (up) -h else h } + fadeOut(tween(180)),
+                                    )
+                            },
+                            label = "ticketCount",
+                        ) { value ->
+                            Text(
+                                text = value.toString(),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                         Text(
                             text = pluralStringResource(R.plurals.n_tickets, count, count),
                             style = MaterialTheme.typography.bodySmall,
@@ -539,16 +572,18 @@ private fun WalletScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) -
                 EmptyState(stringResource(R.string.wallet_empty))
             }
             state.tickets.forEach { ticket ->
-                TicketCard(
-                    ticket = ticket,
-                    printUrl = ticket.guid?.let { vm.printUrl(it) },
-                    onActivate = if (ticket.canActivate) {
-                        { pendingActivation = ticket }
-                    } else {
-                        null
-                    },
-                    onOpenUrl = onOpenUrl,
-                )
+                EnterAnimated(key = ticket.guid ?: ticket.number) {
+                    TicketCard(
+                        ticket = ticket,
+                        printUrl = ticket.guid?.let { vm.printUrl(it) },
+                        onActivate = if (ticket.canActivate) {
+                            { pendingActivation = ticket }
+                        } else {
+                            null
+                        },
+                        onOpenUrl = onOpenUrl,
+                    )
+                }
             }
         }
     }
@@ -638,12 +673,14 @@ private fun HistoryScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) 
                 EmptyState(stringResource(R.string.history_empty))
             }
             state.history.forEach { ticket ->
-                TicketCard(
-                    ticket = ticket,
-                    printUrl = ticket.guid?.let { vm.printUrl(it) },
-                    onActivate = null,
-                    onOpenUrl = onOpenUrl,
-                )
+                EnterAnimated(key = ticket.guid ?: ticket.number) {
+                    TicketCard(
+                        ticket = ticket,
+                        printUrl = ticket.guid?.let { vm.printUrl(it) },
+                        onActivate = null,
+                        onOpenUrl = onOpenUrl,
+                    )
+                }
             }
         }
     }
@@ -677,7 +714,11 @@ private fun CartScreen(state: UiState, vm: AppViewModel, onOpenUrl: (String) -> 
             if (state.cart.isEmpty()) {
                 EmptyState(stringResource(R.string.cart_empty))
             }
-            state.cart.forEach { item -> CartCard(item, onOpenUrl) }
+            state.cart.forEachIndexed { index, item ->
+                EnterAnimated(key = item.bookingId ?: item.payment?.url ?: index) {
+                    CartCard(item, onOpenUrl)
+                }
+            }
             if (state.cart.isNotEmpty()) {
                 WarningBanner(stringResource(R.string.cart_note))
             }

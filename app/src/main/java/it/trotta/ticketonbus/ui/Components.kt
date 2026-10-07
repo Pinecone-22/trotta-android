@@ -1,5 +1,12 @@
 package it.trotta.ticketonbus.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -249,4 +256,39 @@ fun WarningBanner(text: String, tint: Color = MaterialTheme.colorScheme.secondar
             modifier = Modifier.padding(12.dp),
         )
     }
+}
+
+/**
+ * Fades and slides its content in once, the first time it enters composition under a given
+ * [key] (a ticket GUID, a line id, ...). Reusing the same key across a recomposition (a refresh
+ * that returns the same items) does not replay the animation, so it only plays for content that
+ * is actually new on screen.
+ */
+@Composable
+fun EnterAnimated(key: Any, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val visible = remember(key) { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(
+        visibleState = visible,
+        enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 8 },
+        modifier = modifier,
+    ) {
+        content()
+    }
+}
+
+/** A short spring bounce every time [value] changes, skipping the very first composition. */
+@Composable
+fun <T> rememberBounceScale(value: T): Float {
+    val scale = remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    val seen = remember { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(value) {
+        if (seen.value) scale.floatValue = 1.3f else seen.value = true
+    }
+    val animated by animateFloatAsState(
+        targetValue = scale.floatValue,
+        animationSpec = spring(dampingRatio = 0.35f, stiffness = 300f),
+        finishedListener = { scale.floatValue = 1f },
+        label = "bounce",
+    )
+    return animated
 }

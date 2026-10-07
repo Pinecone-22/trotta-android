@@ -4,6 +4,13 @@ import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -50,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -97,15 +105,28 @@ fun TransitApp(state: TransitUiState, vm: TransitViewModel, onOpenUrl: (String) 
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            when (state.screen) {
-                TransitScreen.NEARBY -> NearbyScreen(state, vm, onExit)
-                TransitScreen.STOPS -> StopsScreen(state, vm)
-                TransitScreen.STOP -> StopDetailScreen(state, vm, onOpenUrl)
-                TransitScreen.LINES -> LinesScreen(state, vm)
-                TransitScreen.LINE -> LineDetailScreen(state, vm)
-                TransitScreen.MAP -> MapScreen(state, vm)
+            AnimatedContent(
+                targetState = state.screen,
+                transitionSpec = {
+                    (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 16 })
+                        .togetherWith(fadeOut(tween(120)))
+                },
+                label = "transitScreen",
+            ) { screen ->
+                when (screen) {
+                    TransitScreen.NEARBY -> NearbyScreen(state, vm, onExit)
+                    TransitScreen.STOPS -> StopsScreen(state, vm)
+                    TransitScreen.STOP -> StopDetailScreen(state, vm, onOpenUrl)
+                    TransitScreen.LINES -> LinesScreen(state, vm)
+                    TransitScreen.LINE -> LineDetailScreen(state, vm)
+                    TransitScreen.MAP -> MapScreen(state, vm)
+                }
             }
-            if (state.loading) {
+            AnimatedVisibility(
+                visible = state.loading,
+                enter = fadeIn(tween(150)),
+                exit = fadeOut(tween(150)),
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -402,6 +423,7 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
             subtitle = vm.network?.name,
             onBack = { vm.back() },
             actions = {
+                val starScale = rememberBounceScale(isFavourite)
                 IconButton(onClick = { vm.toggleFavourite(stop.id) }) {
                     Icon(
                         Icons.Filled.Star,
@@ -413,6 +435,7 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
                         } else {
                             MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
                         },
+                        modifier = Modifier.graphicsLayer(scaleX = starScale, scaleY = starScale),
                     )
                 }
                 IconButton(onClick = { vm.openMap() }) {
