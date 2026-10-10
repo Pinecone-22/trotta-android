@@ -52,6 +52,15 @@ enum class MapProvider(val label: String) {
     OPENSTREETMAP("OpenStreetMap"),
 }
 
+/**
+ * Most bundled stop coordinates are OpenStreetMap-derived or interpolated, not the operator's
+ * own official positions. The map views ([AppMapView], its entry points on the transit screens)
+ * and the "check the real time on Google Maps" deep link both depend on a stop's exact position
+ * being right, so both are hidden from the UI until official per-stop coordinates are in the
+ * dataset. Nothing here is deleted - flip this back to true once that data lands.
+ */
+internal const val MAPS_FEATURE_ENABLED = false
+
 val activeMapProvider: MapProvider
     get() = if (BuildConfig.MAPS_API_KEY.isNotBlank()) MapProvider.GOOGLE else MapProvider.OPENSTREETMAP
 

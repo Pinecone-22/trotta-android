@@ -151,14 +151,19 @@ private fun NearbyScreen(state: TransitUiState, vm: TransitViewModel, onExit: ()
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(
             title = stringResource(R.string.transit_title),
-            subtitle = listOfNotNull(network?.name, activeMapProvider.label).joinToString(" · "),
+            subtitle = listOfNotNull(
+                network?.name,
+                activeMapProvider.label.takeIf { MAPS_FEATURE_ENABLED },
+            ).joinToString(" · "),
             onBack = onExit,
             actions = {
                 IconButton(onClick = { vm.requestLocation() }) {
                     Icon(Icons.Filled.LocationOn, contentDescription = stringResource(R.string.action_use_location))
                 }
-                IconButton(onClick = { vm.go(TransitScreen.MAP) }) {
-                    Icon(Icons.Filled.Place, contentDescription = stringResource(R.string.action_map))
+                if (MAPS_FEATURE_ENABLED) {
+                    IconButton(onClick = { vm.go(TransitScreen.MAP) }) {
+                        Icon(Icons.Filled.Place, contentDescription = stringResource(R.string.action_map))
+                    }
                 }
             },
         )
@@ -249,10 +254,12 @@ private fun NearbyScreen(state: TransitUiState, vm: TransitViewModel, onExit: ()
                             onClick = { vm.openStop(item.stop.id) },
                         )
                     }
-                    OutlinedButton(onClick = { vm.go(TransitScreen.MAP) }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.action_see_map))
+                    if (MAPS_FEATURE_ENABLED) {
+                        OutlinedButton(onClick = { vm.go(TransitScreen.MAP) }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.action_see_map))
+                        }
                     }
                 }
             }
@@ -438,8 +445,10 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
                         modifier = Modifier.graphicsLayer(scaleX = starScale, scaleY = starScale),
                     )
                 }
-                IconButton(onClick = { vm.openMap() }) {
-                    Icon(Icons.Filled.Place, contentDescription = stringResource(R.string.action_map))
+                if (MAPS_FEATURE_ENABLED) {
+                    IconButton(onClick = { vm.openMap() }) {
+                        Icon(Icons.Filled.Place, contentDescription = stringResource(R.string.action_map))
+                    }
                 }
             },
         )
@@ -482,74 +491,78 @@ private fun StopDetailScreen(state: TransitUiState, vm: TransitViewModel, onOpen
             }
             if (departures.any { it.estimated }) {
                 WarningBanner(stringResource(R.string.transit_estimates_banner))
-                OutlinedButton(
-                    onClick = { onOpenUrl(vm.transitUrl(stop)) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.action_check_live_times))
+                if (MAPS_FEATURE_ENABLED) {
+                    OutlinedButton(
+                        onClick = { onOpenUrl(vm.transitUrl(stop)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.action_check_live_times))
+                    }
                 }
             }
 
-            Text(
-                stringResource(R.string.transit_map_reach),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (user != null) {
-                if (reach != null) {
+            if (MAPS_FEATURE_ENABLED) {
+                Text(
+                    stringResource(R.string.transit_map_reach),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (user != null) {
+                    if (reach != null) {
+                        Text(
+                            stringResource(
+                                R.string.reach_summary,
+                                reach.distanceLabel,
+                                stringResource(COMPASS_LABELS[reach.compassIndex]),
+                                reach.walkMinutes,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                } else {
                     Text(
-                        stringResource(
-                            R.string.reach_summary,
-                            reach.distanceLabel,
-                            stringResource(COMPASS_LABELS[reach.compassIndex]),
-                            reach.walkMinutes,
+                        stringResource(R.string.transit_reach_prompt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = { vm.requestLocation() }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_use_location))
+                    }
+                }
+                val pins = buildList {
+                    if (user != null) add(MapPin("me", user.lat, user.lon, youAreHere, isUser = true))
+                    add(
+                        MapPin(
+                            id = stop.id,
+                            lat = stop.lat,
+                            lon = stop.lon,
+                            title = stop.name,
+                            snippet = departures.firstOrNull()?.let { "L${it.lineId} · ${it.time}" },
                         ),
-                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-            } else {
-                Text(
-                    stringResource(R.string.transit_reach_prompt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(onClick = { vm.requestLocation() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.action_use_location))
+                val routes = buildList {
+                    lines.take(3).forEachIndexed { index, line ->
+                        val points = vm.lineRoute(line)
+                        if (points.size >= 2) add(MapRoute(points, lineColor(index), 7f))
+                    }
+                    if (path.size >= 2) add(MapRoute(path.map { it.lat to it.lon }, 0xFF546E7A.toInt(), 8f))
                 }
-            }
-            val pins = buildList {
-                if (user != null) add(MapPin("me", user.lat, user.lon, youAreHere, isUser = true))
-                add(
-                    MapPin(
-                        id = stop.id,
-                        lat = stop.lat,
-                        lon = stop.lon,
-                        title = stop.name,
-                        snippet = departures.firstOrNull()?.let { "L${it.lineId} · ${it.time}" },
-                    ),
+                AppMapView(
+                    pins = pins,
+                    routes = routes,
+                    center = stop.lat to stop.lon,
+                    zoom = 15.0,
+                    onPinClick = { pin -> if (pin.id != "me") vm.openStop(pin.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp),
                 )
-            }
-            val routes = buildList {
-                lines.take(3).forEachIndexed { index, line ->
-                    val points = vm.lineRoute(line)
-                    if (points.size >= 2) add(MapRoute(points, lineColor(index), 7f))
-                }
-                if (path.size >= 2) add(MapRoute(path.map { it.lat to it.lon }, 0xFF546E7A.toInt(), 8f))
-            }
-            AppMapView(
-                pins = pins,
-                routes = routes,
-                center = stop.lat to stop.lon,
-                zoom = 15.0,
-                onPinClick = { pin -> if (pin.id != "me") vm.openStop(pin.id) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(260.dp),
-            )
-            val mapsUrl = vm.mapsUrl(stop)
-            if (mapsUrl != null) {
-                Button(onClick = { onOpenUrl(mapsUrl) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.action_directions))
+                val mapsUrl = vm.mapsUrl(stop)
+                if (mapsUrl != null) {
+                    Button(onClick = { onOpenUrl(mapsUrl) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_directions))
+                    }
                 }
             }
 
@@ -769,8 +782,10 @@ private fun LineDetailScreen(state: TransitUiState, vm: TransitViewModel) {
             subtitle = line.description.ifBlank { vm.network?.name.orEmpty() },
             onBack = { vm.back() },
             actions = {
-                IconButton(onClick = { vm.openMap(line.id) }) {
-                    Icon(Icons.Filled.Place, contentDescription = stringResource(R.string.action_map))
+                if (MAPS_FEATURE_ENABLED) {
+                    IconButton(onClick = { vm.openMap(line.id) }) {
+                        Icon(Icons.Filled.Place, contentDescription = stringResource(R.string.action_map))
+                    }
                 }
             },
         )
@@ -781,7 +796,7 @@ private fun LineDetailScreen(state: TransitUiState, vm: TransitViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (route.size >= 2) {
+            if (MAPS_FEATURE_ENABLED && route.size >= 2) {
                 AppMapView(
                     pins = stops.mapNotNull { vm.stop(it.stopId) }
                         .map { stop -> MapPin(stop.id, stop.lat, stop.lon, stop.name) },
